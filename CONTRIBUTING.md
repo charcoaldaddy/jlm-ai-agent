@@ -1,6 +1,12 @@
-# Contributing
+# Contributing to JLM AI Agent
 
-Thank you for your interest in Omni-Agent Protocol!
+Thank you for your interest in JLM AI Agent!
+
+## Official Links
+
+- 🌐 Official Website: https://jlmagent.ai
+- 🐦 X (Twitter): https://x.com/JLM_AI
+- ✈️ Telegram: https://t.me/JLM_AI_Agent
 
 ## Development Setup
 
@@ -21,8 +27,8 @@ corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 4. Clone and setup
 ```bash
-git clone https://github.com/omni-agent-protocol/omni-agent-protocol.git
-cd omni-agent-protocol
+git clone https://github.com/charcoaldaddy/jlm-ai-agent.git
+cd jlm-ai-agent
 pnpm install
 ```
 
