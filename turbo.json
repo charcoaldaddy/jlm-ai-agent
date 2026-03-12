@@ -1,0 +1,61 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "**/.env.*local"
+  ],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [
+        "dist/**",
+        "build/**",
+        "target/**",
+        "Cargo.lock"
+      ],
+      "cache": true,
+      "outputsMode": "hash-only"
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": [
+        "coverage/**"
+      ],
+      "cache": true,
+      "inputs": [
+        "src/**/*.rs",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**",
+        "*.json",
+        "*.toml"
+      ]
+    },
+    "lint": {
+      "cache": true,
+      "outputs": []
+    },
+    "format": {
+      "cache": true,
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "docs": {
+      "cache": true,
+      "outputs": [
+        ".next/**",
+        "storybook-static/**"
+      ]
+    }
+  },
+  "globalEnv": [
+    "NODE_ENV",
+    "RUST_BACKTRACE",
+    "CARGO_INCREMENTAL"
+  ]
+}

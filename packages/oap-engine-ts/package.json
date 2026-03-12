@@ -1,0 +1,31 @@
+{
+  "name": "@jlm-ai-agent/engine",
+  "version": "1.0.0",
+  "description": "TypeScript business logic layer for JLM AI Agent",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@jlm-ai-agent/types": "workspace:*",
+    "@jlm-ai-agent/chain-abstraction": "workspace:*",
+    "@jlm-ai-agent/wallet-mpc": "workspace:*",
+    "@jlm-ai-agent/llm-provider": "workspace:*",
+    "viem": "^2.7.0",
+    "@solana/web3.js": "^1.87.0",
+    "axios": "^1.6.0",
+    "zod": "^3.22.0",
+    "eventsource": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0"
+  }
+}

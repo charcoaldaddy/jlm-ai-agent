@@ -1,0 +1,45 @@
+{
+  "name": "jlm-ai-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise-grade Web3 AI Agent Orchestration Framework",
+  "workspaces": [
+    "packages/*",
+    "adapters/*",
+    "plugins/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "build:rust": "cargo build --workspace",
+    "build:ts": "turbo run build --filter=!./packages/jlm-core-rust",
+    "test": "turbo run test",
+    "test:rust": "cargo test --workspace",
+    "test:ts": "turbo run test --filter=!./packages/jlm-core-rust",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml,rs,toml}\"",
+    "clean": "turbo run clean && cargo clean",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docs:dev": "cd docs && npm run dev",
+    "release": "changesets version && git push --follow-tags",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "husky": "^9.0.10",
+    "prettier": "^3.2.4",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "author": "JLM AI Agent Team",
+  "license": "MIT OR Apache-2.0"
+}

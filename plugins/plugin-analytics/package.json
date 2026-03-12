@@ -1,0 +1,8 @@
+{
+  "name": "@jlm-ai-agent/plugin-analytics",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  }
+}

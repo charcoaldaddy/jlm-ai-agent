@@ -1,0 +1,50 @@
+[workspace]
+members = [
+  "packages/jlm-core-rust",
+  "packages/jlm-engine-ts", 
+  "packages/jlm-chain-abstraction",
+  "packages/jlm-wallet-mpc",
+  "packages/jlm-llm-provider",
+  "packages/jlm-types",
+  "adapters/adapter-solana",
+  "adapters/adapter-evm",
+  "adapters/adapter-cosmos",
+  "adapters/adapter-sui",
+  "plugins/plugin-uniswap",
+  "plugins/plugin-pumpfun",
+  "plugins/plugin-twitter",
+  "plugins/plugin-dao-governance",
+  "plugins/plugin-analytics",
+  "apps/jlm-cli",
+  "apps/jlm-api-server",
+  "apps/jlm-dashboard",
+]
+
+[resolver]
+fallback = "latest"
+
+[cargo]
+rust-version = "1.77"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.bench]
+inherits = "release"
+debug = true
+
+[net]
+git-fetch-with-cli = true
+
+[git]
+fetch-prs = true
+
+[patch.crates-io]
+serde_json = { git = "https://github.com/serde-rs/json", rev = "latest" }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "latest" }
