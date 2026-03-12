@@ -6,7 +6,11 @@ Thank you for your interest in JLM AI Agent!
 
 - 🌐 Official Website: https://jlmagent.ai
 - 🐦 X (Twitter): https://x.com/JLM_AI
+- 📘 Facebook: https://www.facebook.com/jlmaiagent/
 - ✈️ Telegram: https://t.me/JLM_AI_Agent
+- 💬 WhatsApp: https://chat.whatsapp.com/FVpltU0YzN0EQWXh7A2job
+- ✍️ Mirror Blog: https://paragraph.com/@jlmaiagent
+- ✍️ Medium: https://medium.com/@jlm-ai
 
 ## Development Setup
 
