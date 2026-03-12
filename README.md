@@ -9,8 +9,12 @@
 [![Docker](https://img.shields.io/badge/docker-24+-2496ed.svg?logo=docker)](https://www.docker.com/)
 [![CI](https://img.shields.io/github/actions/workflow/status/jlm-ai-agent/ci.yml/badge.svg)](https://github.com/jlm-ai-agent/jlm-ai-agent/actions)
 [![Coverage](https://img.shields.io/codecov/c/github/jlm-ai-agent/jlm-ai-agent.svg)](https://codecov.io/gh/jlm-ai-agent/jlm-ai-agent)
-[![Discord](https://img.shields.io/discord/123456789012345678?logo=discord)](https://discord.gg/jlm-ai-agent)
-[![Twitter](https://img.shields.io/twitter/follow/jlm_ai_agent)](https://twitter.com/jlm_ai_agent)
+
+## Official Links
+
+[🌐 Official Website](https://jlmagent.ai) | [🐦 X (Twitter)](https://x.com/JLM_AI) | [📘 Facebook](https://www.facebook.com/jlmaiagent/) | [✈️ Telegram](https://t.me/JLM_AI_Agent) | [💬 WhatsApp](https://chat.whatsapp.com/FVpltU0YzN0EQWXh7A2job)
+
+[✍️ Mirror Blog](https://paragraph.com/@jlmaiagent) | [✍️ Medium](https://medium.com/@jlm-ai)
 
 </div>
 
