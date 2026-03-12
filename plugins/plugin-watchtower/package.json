@@ -1,0 +1,14 @@
+{
+  "name": "@jlm-ai-agent/plugin-watchtower",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@jlm-ai-agent/types": "workspace:*",
+    "events": "^3.3.0",
+    "axios": "^1.6.0"
+  }
+}

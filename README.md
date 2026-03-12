@@ -20,18 +20,26 @@
 
 ## Overview
 
-**JLM AI Agent** is an enterprise-grade Web3 AI Agent orchestration framework designed for building autonomous, intelligent agents capable of executing complex DeFi strategies, managing DAO governance, and interacting across multiple blockchain networks.
+**JLM AI Agent** is an enterprise-grade Omni-Market AI Agent orchestration framework designed for building autonomous, intelligent agents capable of executing complex trading strategies across multiple asset classes.
 
-## Features
+### Supported Markets
 
-- **Neural Intent Engine**: Transform natural language commands into executable blockchain transactions
+- **Crypto**: Bitcoin, Ethereum, Solana, and 100+ cryptocurrencies
+- **Forex**: EURUSD, GBPUSD, USDJPY, and 20+ major currency pairs
+- **Precious Metals**: Gold (XAUUSD), Silver (XAGUSD), Platinum, Palladium
+- **Stocks**: US equity markets with real-time data
+- **Prediction Markets**: Polymarket binary outcome trading
+
+### Key Features
+
+- **Neural Intent Engine**: Transform natural language commands into executable trades
 - **Swarm Orchestration**: Coordinate multiple AI agents for complex collaborative tasks
-- **Multi-Chain Support**: Native adapters for Solana, EVM-compatible chains, Cosmos, and Sui
+- **Multi-Asset Support**: Unified interface for Crypto, Forex, Metals, Stocks, and Prediction Markets
 - **MPC Wallet Security**: Multi-party computation based wallet management
-- **Advanced Trading**: Built-in arbitrage detection, MEV protection, and gas optimization
-- **DeFi Integration**: Native plugins for Uniswap, Aave, Compound, Jupiter, and more
-- **DAO Tools**: Snapshot voting integration and governance automation
-- **Real-time Analytics**: On-chain data analysis and portfolio tracking
+- **Advanced Trading Strategies**: Trend Following, Mean Reversion, Arbitrage, Pairs Trading, Grid Trading
+- **Global Macro Trading**: Cross-asset correlation analysis (DXY, Gold, Bitcoin)
+- **Prediction Market Intelligence**: Event-driven trading on Polymarket
+- **Real-time Watchtower**: 24/7 monitoring, risk management, and alerts
 
 ## Architecture
 
