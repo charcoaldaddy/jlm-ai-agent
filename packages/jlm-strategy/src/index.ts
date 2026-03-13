@@ -555,6 +555,464 @@ export interface CandleData {
   timestamp: number;
 }
 
+// ==================== BREAKOUT STRATEGY ====================
+
+export class BreakoutStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private candles: CandleData[] = [];
+  private supportLevels: number[] = [];
+  private resistanceLevels: number[] = [];
+  private lookbackPeriod: number = 20;
+  private volumeThreshold: number = 1.5; // Volume must be 1.5x average
+  private atrPeriod: number = 14;
+  private atr: number = 0;
+  private trailingStopPercent: number = 0.02; // 2%
+
+  constructor(config: StrategyConfig, lookbackPeriod: number = 20) {
+    super();
+    this.config = config;
+    this.lookbackPeriod = lookbackPeriod;
+  }
+
+  /**
+   * Add candle data point
+   */
+  addCandle(candle: CandleData): void {
+    this.candles.push(candle);
+    if (this.candles.length > 100) {
+      this.candles.shift();
+    }
+    
+    // Update ATR when we have enough data
+    if (this.candles.length >= this.atrPeriod + 1) {
+      this.calculateATR();
+    }
+  }
+
+  /**
+   * Calculate Average True Range (ATR)
+   */
+  private calculateATR(): void {
+    const periods = this.candles.slice(-this.atrPeriod);
+    let atrSum = 0;
+    
+    for (let i = 1; i < periods.length; i++) {
+      const high = periods[i].high;
+      const low = periods[i].low;
+      const prevClose = periods[i - 1].close;
+      
+      const tr = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      atrSum += tr;
+    }
+    
+    this.atr = atrSum / this.atrPeriod;
+  }
+
+  /**
+   * Identify support and resistance levels using pivot points
+   */
+  private identifyLevels(): { support: number[]; resistance: number[] } {
+    const support: number[] = [];
+    const resistance: number[] = [];
+    
+    if (this.candles.length < this.lookbackPeriod) {
+      return { support, resistance };
+    }
+
+    // Use swing high/low method
+    const recentCandles = this.candles.slice(-this.lookbackPeriod);
+    
+    for (let i = 2; i < recentCandles.length - 2; i++) {
+      const prev2 = recentCandles[i - 2];
+      const prev1 = recentCandles[i - 1];
+      const current = recentCandles[i];
+      const next1 = recentCandles[i + 1];
+      const next2 = recentCandles[i + 2];
+      
+      // Resistance (swing high)
+      if (
+        current.high > prev1.high &&
+        current.high > prev2.high &&
+        current.high > next1.high &&
+        current.high > next2.high
+      ) {
+        resistance.push(current.high);
+      }
+      
+      // Support (swing low)
+      if (
+        current.low < prev1.low &&
+        current.low < prev2.low &&
+        current.low < next1.low &&
+        current.low < next2.low
+      ) {
+        support.push(current.low);
+      }
+    }
+
+    return { support, resistance };
+  }
+
+  /**
+   * Get average volume
+   */
+  private getAverageVolume(): number {
+    if (this.candles.length < 20) return 0;
+    const recentVolumes = this.candles.slice(-20).map(c => c.volume);
+    return recentVolumes.reduce((a, b) => a + b, 0) / recentVolumes.length;
+  }
+
+  /**
+   * Check if breakout is confirmed by volume
+   */
+  private isVolumeConfirmed(): boolean {
+    if (this.candles.length < 2) return false;
+    const currentVolume = this.candles[this.candles.length - 1].volume;
+    const avgVolume = this.getAverageVolume();
+    return currentVolume >= avgVolume * this.volumeThreshold;
+  }
+
+  /**
+   * Get closest support and resistance levels
+   */
+  private getClosestLevels(currentPrice: number): { closestSupport: number; closestResistance: number } {
+    const { support, resistance } = this.identifyLevels();
+    
+    let closestSupport = 0;
+    let closestResistance = 0;
+    
+    // Find closest support below current price
+    for (const level of support) {
+      if (level < currentPrice && level > closestSupport) {
+        closestSupport = level;
+      }
+    }
+    
+    // Find closest resistance above current price
+    for (const level of resistance) {
+      if (level > currentPrice && (closestResistance === 0 || level < closestResistance)) {
+        closestResistance = level;
+      }
+    }
+    
+    return { closestSupport, closestResistance };
+  }
+
+  /**
+   * Generate breakout trading signals
+   */
+  generateSignal(): BreakoutSignal | null {
+    if (this.candles.length < this.lookbackPeriod + 5) return null;
+    
+    const currentCandle = this.candles[this.candles.length - 1];
+    const prevCandle = this.candles[this.candles.length - 2];
+    const currentPrice = currentCandle.close;
+    
+    const { support, resistance } = this.identifyLevels();
+    const { closestSupport, closestResistance } = this.getClosestLevels(currentPrice);
+    
+    // Calculate breakout thresholds
+    const breakoutThreshold = this.atr * 0.5; // Half ATR from level
+    
+    // Check for upside breakout
+    if (resistance.length > 0 && closestResistance > 0) {
+      const breakoutLevel = closestResistance + breakoutThreshold;
+      
+      if (currentPrice >= breakoutLevel && this.isVolumeConfirmed()) {
+        const distanceToSupport = closestSupport > 0 ? (currentPrice - closestSupport) / currentPrice : 1;
+        const riskRewardRatio = closestResistance > 0 
+          ? (closestResistance - currentPrice) / (currentPrice - closestSupport) 
+          : 2;
+        
+        return {
+          type: 'buy',
+          strength: Math.min(riskRewardRatio / 2, 1),
+          price: currentPrice,
+          timestamp: Date.now(),
+          metadata: {
+            breakoutType: 'resistance',
+            breakoutLevel: closestResistance,
+            currentLevel: breakoutLevel,
+            closestSupport,
+            atr: this.atr,
+            volumeConfirmed: true,
+            riskRewardRatio,
+            distanceToSupport,
+          },
+        };
+      }
+    }
+    
+    // Check for downside breakout
+    if (support.length > 0 && closestSupport > 0) {
+      const breakoutLevel = closestSupport - breakoutThreshold;
+      
+      if (currentPrice <= breakoutLevel && this.isVolumeConfirmed()) {
+        const distanceToResistance = closestResistance > 0 ? (closestResistance - currentPrice) / currentPrice : 1;
+        const riskRewardRatio = closestResistance > 0 
+          ? (currentPrice - closestSupport) / (closestResistance - currentPrice)
+          : 2;
+        
+        return {
+          type: 'sell',
+          strength: Math.min(riskRewardRatio / 2, 1),
+          price: currentPrice,
+          timestamp: Date.now(),
+          metadata: {
+            breakoutType: 'support',
+            breakoutLevel: closestSupport,
+            currentLevel: breakoutLevel,
+            closestResistance,
+            atr: this.atr,
+            volumeConfirmed: true,
+            riskRewardRatio,
+            distanceToResistance,
+          },
+        };
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Calculate position size based on risk
+   */
+  calculatePositionSize(entryPrice: number, stopLossPercent: number): number {
+    const riskAmount = this.config.maxPositionSize * stopLossPercent;
+    const priceRisk = entryPrice * stopLossPercent;
+    return riskAmount / priceRisk;
+  }
+
+  /**
+   * Calculate trailing stop price
+   */
+  calculateTrailingStop(currentPrice: number, entryPrice: number, side: 'long' | 'short'): number {
+    if (side === 'long') {
+      const profit = (currentPrice - entryPrice) / entryPrice;
+      if (profit > 0.02) { // Move to breakeven after 2% profit
+        return Math.max(entryPrice, currentPrice * (1 - this.trailingStopPercent));
+      }
+      return entryPrice * (1 - this.stopLoss || 0.02);
+    } else {
+      const profit = (entryPrice - currentPrice) / entryPrice;
+      if (profit > 0.02) {
+        return Math.min(entryPrice, currentPrice * (1 + this.trailingStopPercent));
+      }
+      return entryPrice * (1 + (this.stopLoss || 0.02));
+    }
+  }
+}
+
+export interface BreakoutSignal extends Signal {
+  metadata: {
+    breakoutType: 'resistance' | 'support';
+    breakoutLevel: number;
+    currentLevel: number;
+    closestSupport: number;
+    closestResistance: number;
+    atr: number;
+    volumeConfirmed: boolean;
+    riskRewardRatio: number;
+    distanceToSupport?: number;
+    distanceToResistance?: number;
+  };
+}
+
+// ==================== RSI MOMENTUM STRATEGY ====================
+
+export class RSIMomentumStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private prices: number[] = [];
+  private rsiPeriod: number = 14;
+  private oversoldLevel: number = 30;
+  private overboughtLevel: number = 70;
+  private divergenceLookback: number = 5;
+
+  constructor(config: StrategyConfig, rsiPeriod: number = 14) {
+    super();
+    this.config = config;
+    this.rsiPeriod = rsiPeriod;
+  }
+
+  /**
+   * Add price data point
+   */
+  addPrice(price: number): void {
+    this.prices.push(price);
+    if (this.prices.length > 100) {
+      this.prices.shift();
+    }
+  }
+
+  /**
+   * Calculate RSI
+   */
+  calculateRSI(): number {
+    if (this.prices.length < this.rsiPeriod + 1) return 50;
+    
+    let gains = 0;
+    let losses = 0;
+    
+    const recentPrices = this.prices.slice(-this.rsiPeriod);
+    
+    for (let i = 1; i < recentPrices.length; i++) {
+      const change = recentPrices[i] - recentPrices[i - 1];
+      if (change > 0) {
+        gains += change;
+      } else {
+        losses += Math.abs(change);
+      }
+    }
+    
+    const avgGain = gains / this.rsiPeriod;
+    const avgLoss = losses / this.rsiPeriod;
+    
+    if (avgLoss === 0) return 100;
+    
+    const rs = avgGain / avgLoss;
+    const rsi = 100 - (100 / (1 + rs));
+    
+    return rsi;
+  }
+
+  /**
+   * Detect bullish divergence (price makes lower low, RSI makes higher low)
+   */
+  private detectBullishDivergence(): boolean {
+    if (this.prices.length < this.divergenceLookback * 2) return false;
+    
+    const recentPrices = this.prices.slice(-this.divergenceLookback * 2);
+    const priceLow1 = Math.min(...recentPrices.slice(0, this.divergenceLookback));
+    const priceLow2 = Math.min(...recentPrices.slice(this.divergenceLookback));
+    
+    // Calculate RSI for each period
+    const rsi1 = this.calculateRSIForPeriod(recentPrices.slice(0, this.divergenceLookback + this.rsiPeriod));
+    const rsi2 = this.calculateRSIForPeriod(recentPrices.slice(this.divergenceLookback));
+    
+    return priceLow2 < priceLow1 && rsi2 > rsi1;
+  }
+
+  /**
+   * Detect bearish divergence (price makes higher high, RSI makes lower high)
+   */
+  private detectBearishDivergence(): boolean {
+    if (this.prices.length < this.divergenceLookback * 2) return false;
+    
+    const recentPrices = this.prices.slice(-this.divergenceLookback * 2);
+    const priceHigh1 = Math.max(...recentPrices.slice(0, this.divergenceLookback));
+    const priceHigh2 = Math.max(...recentPrices.slice(this.divergenceLookback));
+    
+    const rsi1 = this.calculateRSIForPeriod(recentPrices.slice(0, this.divergenceLookback + this.rsiPeriod));
+    const rsi2 = this.calculateRSIForPeriod(recentPrices.slice(this.divergenceLookback));
+    
+    return priceHigh2 > priceHigh1 && rsi2 < rsi1;
+  }
+
+  /**
+   * Calculate RSI for a specific period
+   */
+  private calculateRSIForPeriod(prices: number[]): number {
+    if (prices.length < 2) return 50;
+    
+    let gains = 0;
+    let losses = 0;
+    
+    for (let i = 1; i < prices.length; i++) {
+      const change = prices[i] - prices[i - 1];
+      if (change > 0) {
+        gains += change;
+      } else {
+        losses += Math.abs(change);
+      }
+    }
+    
+    const avgGain = gains / (prices.length - 1);
+    const avgLoss = losses / (prices.length - 1);
+    
+    if (avgLoss === 0) return 100;
+    
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+  }
+
+  /**
+   * Generate RSI-based trading signals
+   */
+  generateSignal(): Signal | null {
+    if (this.prices.length < this.rsiPeriod + 5) return null;
+    
+    const currentPrice = this.prices[this.prices.length - 1];
+    const rsi = this.calculateRSI();
+    
+    // Oversold condition with bullish divergence
+    if (rsi < this.oversoldLevel && this.detectBullishDivergence()) {
+      return {
+        type: 'buy',
+        strength: Math.min((this.oversoldLevel - rsi) / this.oversoldLevel + 0.3, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          rsi,
+          condition: 'oversold_bullish_divergence',
+          oversoldLevel: this.oversoldLevel,
+        },
+      };
+    }
+    
+    // Oversold condition
+    if (rsi < this.oversoldLevel) {
+      return {
+        type: 'buy',
+        strength: (this.oversoldLevel - rsi) / this.oversoldLevel,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          rsi,
+          condition: 'oversold',
+          oversoldLevel: this.oversoldLevel,
+        },
+      };
+    }
+    
+    // Overbought condition with bearish divergence
+    if (rsi > this.overboughtLevel && this.detectBearishDivergence()) {
+      return {
+        type: 'sell',
+        strength: Math.min((rsi - this.overboughtLevel) / (100 - this.overboughtLevel) + 0.3, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          rsi,
+          condition: 'overbought_bearish_divergence',
+          overboughtLevel: this.overboughtLevel,
+        },
+      };
+    }
+    
+    // Overbought condition
+    if (rsi > this.overboughtLevel) {
+      return {
+        type: 'sell',
+        strength: (rsi - this.overboughtLevel) / (100 - this.overboughtLevel),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          rsi,
+          condition: 'overbought',
+          overboughtLevel: this.overboughtLevel,
+        },
+      };
+    }
+    
+    return null;
+  }
+}
+
 // ==================== STRATEGY FACTORY ====================
 
 export class StrategyFactory {
@@ -605,6 +1063,20 @@ export class StrategyFactory {
    */
   static createGridTrading(config: StrategyConfig, basePrice: number, gridCount?: number): GridTradingStrategy {
     return new GridTradingStrategy(config, basePrice, gridCount);
+  }
+
+  /**
+   * Create breakout strategy with support/resistance detection
+   */
+  static createBreakout(config: StrategyConfig, lookbackPeriod?: number): BreakoutStrategy {
+    return new BreakoutStrategy(config, lookbackPeriod);
+  }
+
+  /**
+   * Create RSI momentum strategy
+   */
+  static createRSIMomentum(config: StrategyConfig, rsiPeriod?: number): RSIMomentumStrategy {
+    return new RSIMomentumStrategy(config, rsiPeriod);
   }
 }
 
