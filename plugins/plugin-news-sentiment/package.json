@@ -1,0 +1,13 @@
+{
+  "name": "@jlm-ai-agent/plugin-news-sentiment",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@jlm-ai-agent/types": "workspace:*",
+    "axios": "^1.6.0"
+  }
+}
