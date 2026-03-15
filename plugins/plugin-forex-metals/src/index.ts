@@ -58,16 +58,51 @@ export interface ForexPosition {
 }
 
 export const FOREX_PAIRS: ForexPair[] = [
+  // Major Pairs
   { symbol: 'EURUSD', base: 'EUR', quote: 'USD', pip: 0.0001, minTradeSize: 1000 },
   { symbol: 'GBPUSD', base: 'GBP', quote: 'USD', pip: 0.0001, minTradeSize: 1000 },
   { symbol: 'USDJPY', base: 'USD', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'USDCHF', base: 'USD', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
+  // Minor Pairs
   { symbol: 'AUDUSD', base: 'AUD', quote: 'USD', pip: 0.0001, minTradeSize: 1000 },
   { symbol: 'USDCAD', base: 'USD', quote: 'CAD', pip: 0.0001, minTradeSize: 1000 },
-  { symbol: 'USDCHF', base: 'USD', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
   { symbol: 'NZDUSD', base: 'NZD', quote: 'USD', pip: 0.0001, minTradeSize: 1000 },
+  // Cross Pairs
   { symbol: 'EURGBP', base: 'EUR', quote: 'GBP', pip: 0.0001, minTradeSize: 1000 },
   { symbol: 'EURJPY', base: 'EUR', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
   { symbol: 'GBPJPY', base: 'GBP', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'EURAUD', base: 'EUR', quote: 'AUD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'EURCAD', base: 'EUR', quote: 'CAD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'EURCHF', base: 'EUR', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'EURNZD', base: 'EUR', quote: 'NZD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'GBPAUD', base: 'GBP', quote: 'AUD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'GBPCAD', base: 'GBP', quote: 'CAD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'GBPCHF', base: 'GBP', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'GBPNZD', base: 'GBP', quote: 'NZD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'AUDJPY', base: 'AUD', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'CADJPY', base: 'CAD', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'CHFJPY', base: 'CHF', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'NZDJPY', base: 'NZD', quote: 'JPY', pip: 0.01, minTradeSize: 1000 },
+  // Exotic Pairs
+  { symbol: 'USDSEK', base: 'USD', quote: 'SEK', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDNOK', base: 'USD', quote: 'NOK', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDMXN', base: 'USD', quote: 'MXN', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDZAR', base: 'USD', quote: 'ZAR', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDTRY', base: 'USD', quote: 'TRY', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDHKD', base: 'USD', quote: 'HKD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDSGD', base: 'USD', quote: 'SGD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDTHB', base: 'USD', quote: 'THB', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'USDPLN', base: 'USD', quote: 'PLN', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'USDCZK', base: 'USD', quote: 'CZK', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'USDHUF', base: 'USD', quote: 'HUF', pip: 0.01, minTradeSize: 1000 },
+  { symbol: 'USDRUB', base: 'USD', quote: 'RUB', pip: 0.01, minTradeSize: 1000 },
+  // Additional Cross Pairs
+  { symbol: 'AUDNZD', base: 'AUD', quote: 'NZD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'AUDCAD', base: 'AUD', quote: 'CAD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'AUDCHF', base: 'AUD', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'CADCHF', base: 'CAD', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'NZDCAD', base: 'NZD', quote: 'CAD', pip: 0.0001, minTradeSize: 1000 },
+  { symbol: 'NZDCHF', base: 'NZD', quote: 'CHF', pip: 0.0001, minTradeSize: 1000 },
 ];
 
 export const METAL_PAIRS: MetalPair[] = [

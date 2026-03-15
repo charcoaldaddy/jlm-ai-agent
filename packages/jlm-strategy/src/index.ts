@@ -1013,6 +1013,507 @@ export class RSIMomentumStrategy extends EventEmitter {
   }
 }
 
+// ==================== MACD CROSSOVER STRATEGY ====================
+
+export class MACDCrossoverStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private candles: CandleData[] = [];
+  private fastPeriod: number = 12;
+  private slowPeriod: number = 26;
+  private signalPeriod: number = 9;
+  private histogramHistory: number[] = [];
+
+  constructor(config: StrategyConfig, fastPeriod: number = 12, slowPeriod: number = 26) {
+    super();
+    this.config = config;
+    this.fastPeriod = fastPeriod;
+    this.slowPeriod = slowPeriod;
+  }
+
+  /**
+   * Add candle data point
+   */
+  addCandle(candle: CandleData): void {
+    this.candles.push(candle);
+    if (this.candles.length > 100) {
+      this.candles.shift();
+    }
+  }
+
+  /**
+   * Calculate EMA for a period
+   */
+  private calculateEMA(prices: number[], period: number): number {
+    if (prices.length < period) return 0;
+    
+    const multiplier = 2 / (period + 1);
+    let ema = prices[0];
+    
+    for (let i = 1; i < prices.length; i++) {
+      ema = (prices[i] - ema) * multiplier + ema;
+    }
+    
+    return ema;
+  }
+
+  /**
+   * Calculate MACD values
+   */
+  calculateMACD(): { macd: number; signal: number; histogram: number } {
+    if (this.candles.length < this.slowPeriod) {
+      return { macd: 0, signal: 0, histogram: 0 };
+    }
+    
+    const prices = this.candles.map(c => c.close);
+    const fastEMA = this.calculateEMA(prices, this.fastPeriod);
+    const slowEMA = this.calculateEMA(prices, this.slowPeriod);
+    
+    const macd = fastEMA - slowEMA;
+    
+    // Calculate signal line from MACD history
+    this.histogramHistory.push(macd);
+    if (this.histogramHistory.length > this.signalPeriod) {
+      this.histogramHistory.shift();
+    }
+    
+    const signal = this.calculateEMA(this.histogramHistory, Math.min(this.histogramHistory.length, this.signalPeriod));
+    const histogram = macd - signal;
+    
+    return { macd, signal, histogram };
+  }
+
+  /**
+   * Detect MACD crossover
+   */
+  private detectCrossover(prevMACD: number, prevSignal: number, currMACD: number, currSignal: number): 'bullish' | 'bearish' | null {
+    // Bullish crossover: MACD crosses above signal
+    if (prevMACD < prevSignal && currMACD > currSignal) {
+      return 'bullish';
+    }
+    // Bearish crossover: MACD crosses below signal
+    if (prevMACD > prevSignal && currMACD < currSignal) {
+      return 'bearish';
+    }
+    return null;
+  }
+
+  /**
+   * Generate MACD-based trading signals
+   */
+  generateSignal(): Signal | null {
+    if (this.candles.length < this.slowPeriod + 2) return null;
+    
+    const currentPrice = this.candles[this.candles.length - 1].close;
+    const prevCandle = this.candles[this.candles.length - 2];
+    
+    // Calculate MACD for current and previous candle
+    const prevMACD = this.calculateMACDAt(this.candles.length - 2);
+    const currMACD = this.calculateMACD();
+    
+    const crossover = this.detectCrossover(prevMACD.macd, prevMACD.signal, currMACD.macd, currMACD.signal);
+    
+    if (crossover === 'bullish') {
+      const strength = Math.min(Math.abs(currMACD.histogram) / (currentPrice * 0.01), 1);
+      return {
+        type: 'buy',
+        strength: 0.5 + strength * 0.5,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          macd: currMACD.macd,
+          signal: currMACD.signal,
+          histogram: currMACD.histogram,
+          crossover: 'bullish',
+        },
+      };
+    }
+    
+    if (crossover === 'bearish') {
+      const strength = Math.min(Math.abs(currMACD.histogram) / (currentPrice * 0.01), 1);
+      return {
+        type: 'sell',
+        strength: 0.5 + strength * 0.5,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          macd: currMACD.macd,
+          signal: currMACD.signal,
+          histogram: currMACD.histogram,
+          crossover: 'bearish',
+        },
+      };
+    }
+    
+    // Zero line crossover
+    if (currMACD.macd > 0 && prevMACD.macd < 0) {
+      return {
+        type: 'buy',
+        strength: 0.6,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          macd: currMACD.macd,
+          signal: currMACD.signal,
+          histogram: currMACD.histogram,
+          crossover: 'zero_line_bullish',
+        },
+      };
+    }
+    
+    if (currMACD.macd < 0 && prevMACD.macd > 0) {
+      return {
+        type: 'sell',
+        strength: 0.6,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          macd: currMACD.macd,
+          signal: currMACD.signal,
+          histogram: currMACD.histogram,
+          crossover: 'zero_line_bearish',
+        },
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Calculate MACD at specific index
+   */
+  private calculateMACDAt(index: number): { macd: number; signal: number; histogram: number } {
+    if (index < this.slowPeriod) {
+      return { macd: 0, signal: 0, histogram: 0 };
+    }
+    
+    const prices = this.candles.slice(0, index + 1).map(c => c.close);
+    const fastEMA = this.calculateEMA(prices, this.fastPeriod);
+    const slowEMA = this.calculateEMA(prices, this.slowPeriod);
+    
+    const macd = fastEMA - slowEMA;
+    
+    // Calculate signal from historical values
+    const histValues: number[] = [];
+    for (let i = this.slowPeriod; i <= index; i++) {
+      const p = this.candles.slice(0, i + 1).map(c => c.close);
+      const fEM = this.calculateEMA(p, this.fastPeriod);
+      const sEM = this.calculateEMA(p, this.slowPeriod);
+      histValues.push(fEM - sEM);
+    }
+    
+    const signal = this.calculateEMA(histValues, Math.min(histValues.length, this.signalPeriod));
+    const histogram = macd - signal;
+    
+    return { macd, signal, histogram };
+  }
+}
+
+// ==================== BOLLINGER BANDS STRATEGY ====================
+
+export class BollingerBandsStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private candles: CandleData[] = [];
+  private period: number = 20;
+  private stdDevMultiplier: number = 2;
+  private upperBand: number = 0;
+  private middleBand: number = 0;
+  private lowerBand: number = 0;
+
+  constructor(config: StrategyConfig, period: number = 20, stdDevMultiplier: number = 2) {
+    super();
+    this.config = config;
+    this.period = period;
+    this.stdDevMultiplier = stdDevMultiplier;
+  }
+
+  /**
+   * Add candle data point
+   */
+  addCandle(candle: CandleData): void {
+    this.candles.push(candle);
+    if (this.candles.length > 100) {
+      this.candles.shift();
+    }
+    
+    if (this.candles.length >= this.period) {
+      this.calculateBands();
+    }
+  }
+
+  /**
+   * Calculate Bollinger Bands
+   */
+  private calculateBands(): void {
+    const prices = this.candles.slice(-this.period).map(c => c.close);
+    
+    // Calculate middle band (SMA)
+    this.middleBand = prices.reduce((a, b) => a + b, 0) / prices.length;
+    
+    // Calculate standard deviation
+    const variance = prices.reduce((a, b) => a + Math.pow(b - this.middleBand, 2), 0) / prices.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Calculate upper and lower bands
+    this.upperBand = this.middleBand + stdDev * this.stdDevMultiplier;
+    this.lowerBand = this.middleBand - stdDev * this.stdDevMultiplier;
+  }
+
+  /**
+   * Calculate bandwidth (measure of volatility)
+   */
+  getBandwidth(): number {
+    return (this.upperBand - this.lowerBand) / this.middleBand;
+  }
+
+  /**
+   * Calculate %B (position within bands)
+   */
+  getPercentB(price: number): number {
+    return (price - this.lowerBand) / (this.upperBand - this.lowerBand);
+  }
+
+  /**
+   * Detect squeeze (low volatility)
+   */
+  isSqueezing(threshold: number = 0.1): boolean {
+    return this.getBandwidth() < threshold;
+  }
+
+  /**
+   * Generate Bollinger Bands trading signals
+   */
+  generateSignal(): Signal | null {
+    if (this.candles.length < this.period + 1) return null;
+    
+    const currentPrice = this.candles[this.candles.length - 1].close;
+    const prevPrice = this.candles[this.candles.length - 2].close;
+    
+    // Buy signal: price touches lower band or breaks out
+    if (currentPrice <= this.lowerBand || (prevPrice > this.lowerBand && currentPrice < this.lowerBand)) {
+      return {
+        type: 'buy',
+        strength: 0.8,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          band: 'lower',
+          price: currentPrice,
+          lowerBand: this.lowerBand,
+          middleBand: this.middleBand,
+          upperBand: this.upperBand,
+          bandwidth: this.getBandwidth(),
+          percentB: this.getPercentB(currentPrice),
+        },
+      };
+    }
+    
+    // Sell signal: price touches upper band or breaks out
+    if (currentPrice >= this.upperBand || (prevPrice < this.upperBand && currentPrice > this.upperBand)) {
+      return {
+        type: 'sell',
+        strength: 0.8,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          band: 'upper',
+          price: currentPrice,
+          lowerBand: this.lowerBand,
+          middleBand: this.middleBand,
+          upperBand: this.upperBand,
+          bandwidth: this.getBandwidth(),
+          percentB: this.getPercentB(currentPrice),
+        },
+      };
+    }
+    
+    // Mean reversion: price at extremes
+    const percentB = this.getPercentB(currentPrice);
+    if (percentB < 0.1) {
+      return {
+        type: 'buy',
+        strength: 0.6,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          band: 'lower_extreme',
+          percentB,
+          lowerBand: this.lowerBand,
+          upperBand: this.upperBand,
+        },
+      };
+    }
+    
+    if (percentB > 0.9) {
+      return {
+        type: 'sell',
+        strength: 0.6,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          band: 'upper_extreme',
+          percentB,
+          lowerBand: this.lowerBand,
+          upperBand: this.upperBand,
+        },
+      };
+    }
+    
+    return null;
+  }
+}
+
+// ==================== VOLATILITY BREAKOUT STRATEGY ====================
+
+export class VolatilityBreakoutStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private candles: CandleData[] = [];
+  private atrPeriod: number = 14;
+  private atrMultiplier: number = 2;
+  private atr: number = 0;
+  private lookbackPeriod: number = 20;
+
+  constructor(config: StrategyConfig, atrPeriod: number = 14, atrMultiplier: number = 2) {
+    super();
+    this.config = config;
+    this.atrPeriod = atrPeriod;
+    this.atrMultiplier = atrMultiplier;
+  }
+
+  /**
+   * Add candle data point
+   */
+  addCandle(candle: CandleData): void {
+    this.candles.push(candle);
+    if (this.candles.length > 100) {
+      this.candles.shift();
+    }
+    
+    if (this.candles.length >= this.atrPeriod + 1) {
+      this.calculateATR();
+    }
+  }
+
+  /**
+   * Calculate Average True Range (ATR)
+   */
+  private calculateATR(): void {
+    const periods = this.candles.slice(-this.atrPeriod);
+    let atrSum = 0;
+    
+    for (let i = 1; i < periods.length; i++) {
+      const high = periods[i].high;
+      const low = periods[i].low;
+      const prevClose = periods[i - 1].close;
+      
+      const tr = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      atrSum += tr;
+    }
+    
+    this.atr = atrSum / this.atrPeriod;
+  }
+
+  /**
+   * Calculate volatility-adjusted levels
+   */
+  getVolatilityLevels(): { upper: number; lower: number; range: number } {
+    if (this.candles.length === 0) {
+      return { upper: 0, lower: 0, range: 0 };
+    }
+    
+    const lastCandle = this.candles[this.candles.length - 1];
+    const close = lastCandle.close;
+    const upper = close + this.atr * this.atrMultiplier;
+    const lower = close - this.atr * this.atrMultiplier;
+    const range = upper - lower;
+    
+    return { upper, lower, range };
+  }
+
+  /**
+   * Check if price is breaking out
+   */
+  isBreakout(): 'upside' | 'downside' | null {
+    if (this.candles.length < 2) return null;
+    
+    const currentCandle = this.candles[this.candles.length - 1];
+    const prevCandle = this.candles[this.candles.length - 2];
+    const { upper, lower } = this.getVolatilityLevels();
+    
+    // Upside breakout
+    if (currentCandle.high > upper && prevCandle.high <= upper) {
+      return 'upside';
+    }
+    
+    // Downside breakout
+    if (currentCandle.low < lower && prevCandle.low >= lower) {
+      return 'downside';
+    }
+    
+    return null;
+  }
+
+  /**
+   * Generate volatility breakout signals
+   */
+  generateSignal(): Signal | null {
+    if (this.candles.length < this.atrPeriod + 2) return null;
+    
+    const currentPrice = this.candles[this.candles.length - 1].close;
+    const breakout = this.isBreakout();
+    const { upper, lower, range } = this.getVolatilityLevels();
+    
+    if (breakout === 'upside') {
+      const strength = Math.min((currentPrice - upper + range) / range, 1);
+      return {
+        type: 'buy',
+        strength: 0.5 + strength * 0.5,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          breakout: 'upside',
+          atr: this.atr,
+          upperLevel: upper,
+          lowerLevel: lower,
+          range,
+          volatility: this.atr / currentPrice,
+        },
+      };
+    }
+    
+    if (breakout === 'downside') {
+      const strength = Math.min((lower - currentPrice + range) / range, 1);
+      return {
+        type: 'sell',
+        strength: 0.5 + strength * 0.5,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          breakout: 'downside',
+          atr: this.atr,
+          upperLevel: upper,
+          lowerLevel: lower,
+          range,
+          volatility: this.atr / currentPrice,
+        },
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get current volatility metric
+   */
+  getVolatility(): number {
+    if (this.candles.length === 0) return 0;
+    return this.atr / this.candles[this.candles.length - 1].close;
+  }
+}
+
 // ==================== STRATEGY FACTORY ====================
 
 export class StrategyFactory {
@@ -1077,6 +1578,27 @@ export class StrategyFactory {
    */
   static createRSIMomentum(config: StrategyConfig, rsiPeriod?: number): RSIMomentumStrategy {
     return new RSIMomentumStrategy(config, rsiPeriod);
+  }
+
+  /**
+   * Create MACD crossover strategy
+   */
+  static createMACDCrossover(config: StrategyConfig, fastPeriod?: number, slowPeriod?: number): MACDCrossoverStrategy {
+    return new MACDCrossoverStrategy(config, fastPeriod, slowPeriod);
+  }
+
+  /**
+   * Create Bollinger Bands strategy
+   */
+  static createBollingerBands(config: StrategyConfig, period?: number, stdDevMultiplier?: number): BollingerBandsStrategy {
+    return new BollingerBandsStrategy(config, period, stdDevMultiplier);
+  }
+
+  /**
+   * Create Volatility Breakout strategy
+   */
+  static createVolatilityBreakout(config: StrategyConfig, atrPeriod?: number, atrMultiplier?: number): VolatilityBreakoutStrategy {
+    return new VolatilityBreakoutStrategy(config, atrPeriod, atrMultiplier);
   }
 }
 
