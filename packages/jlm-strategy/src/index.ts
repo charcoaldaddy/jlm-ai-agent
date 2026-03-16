@@ -1514,6 +1514,279 @@ export class VolatilityBreakoutStrategy extends EventEmitter {
   }
 }
 
+// ==================== STOCHASTIC OSCILLATOR STRATEGY ====================
+
+export class StochasticOscillatorStrategy extends EventEmitter {
+  private config: StrategyConfig;
+  private candles: CandleData[] = [];
+  private kPeriod: number = 14;  // %K period
+  private dPeriod: number = 3;    // %D period
+  private overboughtLevel: number = 80;
+  private oversoldLevel: number = 20;
+  private smoothing: number = 3;  // Smoothed %K
+  private kHistory: number[] = [];
+
+  constructor(config: StrategyConfig, kPeriod: number = 14, dPeriod: number = 3) {
+    super();
+    this.config = config;
+    this.kPeriod = kPeriod;
+    this.dPeriod = dPeriod;
+  }
+
+  /**
+   * Add candle data point
+   */
+  addCandle(candle: CandleData): void {
+    this.candles.push(candle);
+    if (this.candles.length > 100) {
+      this.candles.shift();
+    }
+  }
+
+  /**
+   * Calculate Stochastic Oscillator values
+   */
+  calculateStochastic(): { k: number; d: number } {
+    if (this.candles.length < this.kPeriod) {
+      return { k: 50, d: 50 };
+    }
+
+    const recentCandles = this.candles.slice(-this.kPeriod);
+    const currentClose = this.candles[this.candles.length - 1].close;
+
+    // Find highest high and lowest low over the period
+    let highestHigh = -Infinity;
+    let lowestLow = Infinity;
+
+    for (const candle of recentCandles) {
+      if (candle.high > highestHigh) highestHigh = candle.high;
+      if (candle.low < lowestLow) lowestLow = candle.low;
+    }
+
+    // Calculate %K
+    const range = highestHigh - lowestLow;
+    let k = 50; // Default if range is zero
+    if (range > 0) {
+      k = ((currentClose - lowestLow) / range) * 100;
+    }
+
+    // Apply smoothing to %K
+    this.kHistory.push(k);
+    if (this.kHistory.length > this.smoothing) {
+      this.kHistory.shift();
+    }
+
+    const smoothedK = this.kHistory.reduce((a, b) => a + b, 0) / this.kHistory.length;
+
+    // Calculate %D (smoothed %K's SMA)
+    const d = smoothedK;
+
+    return { k: smoothedK, d };
+  }
+
+  /**
+   * Detect bullish crossover (%K crosses above %D in oversold zone)
+   */
+  private detectBullishCrossover(prevK: number, prevD: number, currK: number, currD: number): boolean {
+    return prevK < prevD && currK > currD;
+  }
+
+  /**
+   * Detect bearish crossover (%K crosses below %D in overbought zone)
+   */
+  private detectBearishCrossover(prevK: number, prevD: number, currK: number, currD: number): boolean {
+    return prevK > prevD && currK < currD;
+  }
+
+  /**
+   * Detect bullish divergence (price makes lower low, Stochastic makes higher low)
+   */
+  private detectBullishDivergence(): boolean {
+    if (this.candles.length < this.kPeriod * 2) return false;
+
+    const recentPrices = this.candles.slice(-this.kPeriod * 2).map(c => c.low);
+    const priceLow1 = Math.min(...recentPrices.slice(0, this.kPeriod));
+    const priceLow2 = Math.min(...recentPrices.slice(this.kPeriod));
+
+    const k1 = this.kHistory[Math.floor(this.kHistory.length / 2)] || 50;
+    const k2 = this.kHistory[this.kHistory.length - 1] || 50;
+
+    return priceLow2 < priceLow1 && k2 > k1;
+  }
+
+  /**
+   * Detect bearish divergence (price makes higher high, Stochastic makes lower high)
+   */
+  private detectBearishDivergence(): boolean {
+    if (this.candles.length < this.kPeriod * 2) return false;
+
+    const recentPrices = this.candles.slice(-this.kPeriod * 2).map(c => c.high);
+    const priceHigh1 = Math.max(...recentPrices.slice(0, this.kPeriod));
+    const priceHigh2 = Math.max(...recentPrices.slice(this.kPeriod));
+
+    const k1 = this.kHistory[Math.floor(this.kHistory.length / 2)] || 50;
+    const k2 = this.kHistory[this.kHistory.length - 1] || 50;
+
+    return priceHigh2 > priceHigh1 && k2 < k1;
+  }
+
+  /**
+   * Generate Stochastic Oscillator trading signals
+   */
+  generateSignal(): Signal | null {
+    if (this.candles.length < this.kPeriod + 2) return null;
+
+    const currentPrice = this.candles[this.candles.length - 1].close;
+
+    // Calculate current and previous Stochastic values
+    const prevStochastic = this.calculateStochasticAt(this.candles.length - 2);
+    const currStochastic = this.calculateStochastic();
+
+    const prevK = prevStochastic.k;
+    const prevD = prevStochastic.d;
+    const currK = currStochastic.k;
+    const currD = currStochastic.d;
+
+    // Buy signal: Stochastic in oversold zone with bullish crossover
+    if (currK < this.oversoldLevel && this.detectBullishCrossover(prevK, prevD, currK, currD)) {
+      return {
+        type: 'buy',
+        strength: Math.min((this.oversoldLevel - currK) / this.oversoldLevel + 0.3, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'oversold_bullish_crossover',
+          oversoldLevel: this.oversoldLevel,
+        },
+      };
+    }
+
+    // Buy signal: Stochastic in oversold zone with bullish divergence
+    if (currK < this.oversoldLevel && this.detectBullishDivergence()) {
+      return {
+        type: 'buy',
+        strength: Math.min((this.oversoldLevel - currK) / this.oversoldLevel + 0.4, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'oversold_bullish_divergence',
+          oversoldLevel: this.oversoldLevel,
+        },
+      };
+    }
+
+    // Buy signal: Simple oversold condition
+    if (currK < this.oversoldLevel) {
+      return {
+        type: 'buy',
+        strength: (this.oversoldLevel - currK) / this.oversoldLevel,
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'oversold',
+          oversoldLevel: this.oversoldLevel,
+        },
+      };
+    }
+
+    // Sell signal: Stochastic in overbought zone with bearish crossover
+    if (currK > this.overboughtLevel && this.detectBearishCrossover(prevK, prevD, currK, currD)) {
+      return {
+        type: 'sell',
+        strength: Math.min((currK - this.overboughtLevel) / (100 - this.overboughtLevel) + 0.3, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'overbought_bearish_crossover',
+          overboughtLevel: this.overboughtLevel,
+        },
+      };
+    }
+
+    // Sell signal: Stochastic in overbought zone with bearish divergence
+    if (currK > this.overboughtLevel && this.detectBearishDivergence()) {
+      return {
+        type: 'sell',
+        strength: Math.min((currK - this.overboughtLevel) / (100 - this.overboughtLevel) + 0.4, 1),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'overbought_bearish_divergence',
+          overboughtLevel: this.overboughtLevel,
+        },
+      };
+    }
+
+    // Sell signal: Simple overbought condition
+    if (currK > this.overboughtLevel) {
+      return {
+        type: 'sell',
+        strength: (currK - this.overboughtLevel) / (100 - this.overboughtLevel),
+        price: currentPrice,
+        timestamp: Date.now(),
+        metadata: {
+          k: currK,
+          d: currD,
+          condition: 'overbought',
+          overboughtLevel: this.overboughtLevel,
+        },
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate Stochastic at specific index
+   */
+  private calculateStochasticAt(index: number): { k: number; d: number } {
+if (index < this.kPeriod) {
+      return { k: 50, d: 50 };
+    }
+
+    const candles = this.candles.slice(0, index + 1);
+    const recentCandles = candles.slice(-this.kPeriod);
+    const currentClose = candles[index].close;
+
+    let highestHigh = -Infinity;
+    let lowestLow = Infinity;
+
+    for (const candle of recentCandles) {
+      if (candle.high > highestHigh) highestHigh = candle.high;
+      if (candle.low < lowestLow) lowestLow = candle.low;
+    }
+
+    const range = highestHigh - lowestLow;
+    let k = 50;
+    if (range > 0) {
+      k = ((currentClose - lowestLow) / range) * 100;
+    }
+
+    return { k, d: k };
+  }
+
+  /**
+   * Get current Stochastic values
+   */
+  getCurrentValues(): { k: number; d: number; status: string } {
+    const { k, d } = this.calculateStochastic();
+    let status = 'neutral';
+    if (k < this.oversoldLevel) status = 'oversold';
+    if (k > this.overboughtLevel) status = 'overbought';
+    return { k, d, status };
+  }
+}
+
 // ==================== STRATEGY FACTORY ====================
 
 export class StrategyFactory {
@@ -1599,6 +1872,13 @@ export class StrategyFactory {
    */
   static createVolatilityBreakout(config: StrategyConfig, atrPeriod?: number, atrMultiplier?: number): VolatilityBreakoutStrategy {
     return new VolatilityBreakoutStrategy(config, atrPeriod, atrMultiplier);
+  }
+
+  /**
+   * Create Stochastic Oscillator strategy
+   */
+  static createStochasticOscillator(config: StrategyConfig, kPeriod?: number, dPeriod?: number): StochasticOscillatorStrategy {
+    return new StochasticOscillatorStrategy(config, kPeriod, dPeriod);
   }
 }
 
